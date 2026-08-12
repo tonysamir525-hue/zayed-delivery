@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>حاسبة مرتبات مندوبي التوصيل</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F2F6F4;
+    --surface:#FFFFFF;
+    --surface-2:#EAF2EE;
+    --primary:#0F5C4E;
+    --primary-dark:#0A3F35;
+    --primary-light:#DCEEE7;
+    --accent:#C98A1F;
+    --accent-light:#F6E7CC;
+    --text:#16241F;
+    --text-muted:#5B6B65;
+    --border:#DCE7E2;
+    --border-strong:#BFD3CA;
+    --danger:#A6402A;
+    --danger-light:#F7E2DB;
+    --leave:#5B4FA8;
+    --leave-light:#EBE8F7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Tajawal', sans-serif;
+    line-height:1.6;
+  }
+  .app{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+
+  .hero{
+    background:var(--primary);
+    border-radius:18px;
+    padding:34px 32px 26px;
+    color:#fff;
+    position:relative;
+    overflow:hidden;
+    margin-bottom:22px;
+  }
+  .eyebrow{
+    font-size:13px;
+    letter-spacing:.5px;
+    color:var(--accent-light);
+    font-weight:700;
+    margin-bottom:8px;
+  }
+  .hero h1{
+    font-family:'Cairo', sans-serif;
+    font-weight:800;
+    font-size:29px;
+    margin:0 0 8px;
+  }
+  .hero p{
+    margin:0;
+    color:#DCEFE8;
+    font-size:14.5px;
+    max-width:600px;
+  }
+  .route-svg{width:100%;height:56px;margin-top:20px;display:block;}
+
+  .toolbar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:14px 18px;
+    margin-bottom:20px;
+  }
+  .period-field{display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+  .period-field label{font-size:14px;color:var(--text-muted);font-weight:500;}
+  .period-field input{
+    border:1px solid var(--border-strong);
+    border-radius:9px;
+    padding:8px 10px;
+    font-family:'Tajawal', sans-serif;
+    font-size:14px;
+    background:var(--surface);
+    color:var(--text);
+  }
+  .seg-tabs{display:flex;gap:6px;background:var(--surface-2);padding:4px;border-radius:10px;}
+  .seg-tab{
+    border:none;
+    background:transparent;
+    padding:7px 12px;
+    font-size:13px;
+    font-weight:700;
+    border-radius:7px;
+    color:var(--text-muted);
+    cursor:pointer;
+    font-family:'Tajawal', sans-serif;
+  }
+  .seg-tab.active{background:var(--primary);color:#fff;}
+
+  .toolbar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .summary-chip{
+    background:var(--accent-light);
+    color:#4A3308;
+    font-weight:700;
+    font-size:14px;
+    padding:9px 16px;
+    border-radius:999px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .summary-chip .num{font-family:'JetBrains Mono', monospace;font-size:15px;}
+
+  .btn-export{
+    background:var(--primary-dark);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:10px 16px;
+    font-weight:700;
+    font-size:13.5px;
+    cursor:pointer;
+    font-family:'Tajawal', sans-serif;
+  }
+  .btn-export:hover{background:#072B24;}
+
+  .leave-banner{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--leave-light);
+    color:#2E2760;
+    border:1px solid #D4CDEE;
+    border-radius:12px;
+    padding:11px 16px;
+    font-size:13.5px;
+    margin-bottom:20px;
+  }
+  .leave-banner b{font-weight:700;}
+
+  .roster-panel{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:18px 20px;
+    margin-bottom:20px;
+  }
+  .roster-panel h2{
+    font-family:'Cairo', sans-serif;
+    font-size:16px;
+    font-weight:700;
+    margin:0 0 12px;
+    color:var(--primary-dark);
+  }
+  .roster-add{display:flex;gap:10px;margin-bottom:12px;}
+  .roster-add input{
+    flex:1;
+    border:1px solid var(--border-strong);
+    border-radius:9px;
+    padding:9px 11px;
+    font-family:'Tajawal', sans-serif;
+    font-size:14px;
+    background:#FBFDFC;
+    color:var(--text);
+  }
+  .roster-add button{background:var(--primary);color:#fff;padding:9px 18px;border-radius:9px;}
+  .roster-add button:hover{background:var(--primary-dark);}
+  .roster-list{display:flex;flex-wrap:wrap;gap:8px;}
+  .roster-chip{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:6px 8px 6px 14px;
+    font-size:13px;
+    color:var(--primary-dark);
+    font-weight:500;
+  }
+  .roster-chip button{
+    background:var(--danger-light);
+    color:var(--danger);
+    border:none;
+    border-radius:50%;
+    width:20px;
+    height:20px;
+    font-size:12px;
+    line-height:1;
+    padding:0;
+    cursor:pointer;
+  }
+  .roster-empty{font-size:13px;color:var(--text-muted);}
+
+  .layout{
+    display:grid;
+    grid-template-columns:360px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:20px;
+  }
+  .panel h2{
+    font-family:'Cairo', sans-serif;
+    font-size:17px;
+    font-weight:700;
+    margin:0 0 16px;
+    color:var(--primary-dark);
+  }
+
+  .field{margin-bottom:13px;}
+  .field label{
+    display:block;
+    font-size:13px;
+    color:var(--text-muted);
+    margin-bottom:5px;
+    font-weight:500;
+  }
+  .field input, .field select{
+    width:100%;
+    border:1px solid var(--border-strong);
+    border-radius:9px;
+    padding:9px 11px;
+    font-family:'Tajawal', sans-serif;
+    font-size:14.5px;
+    background:#FBFDFC;
+    color:var(--text);
+  }
+  .field input:focus, .field select:focus{
+    outline:none;
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px var(--primary-light);
+  }
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  .group-title{
+    font-size:12px;
+    font-weight:700;
+    color:var(--primary);
+    margin:16px 0 8px;
+    padding-top:10px;
+    border-top:1px dashed var(--border-strong);
+  }
+  .group-title:first-of-type{border-top:none;padding-top:0;margin-top:2px;}
+  .group-title.danger-title{color:var(--danger);}
+
+  .btn-row{display:flex;gap:10px;margin-top:18px;}
+  button{
+    font-family:'Tajawal', sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+    border-radius:10px;
+    padding:11px 16px;
+    border:none;
+    cursor:pointer;
+  }
+  .btn-primary{background:var(--primary);color:#fff;flex:1;}
+  .btn-primary:hover{background:var(--primary-dark);}
+  .btn-ghost{background:var(--surface-2);color:var(--primary-dark);border:1px solid var(--border-strong);}
+  .btn-ghost:hover{background:var(--border);}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:right;
+    font-size:11.5px;
+    color:var(--text-muted);
+    font-weight:700;
+    padding:8px 6px;
+    border-bottom:2px solid var(--border);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:10px 6px;
+    border-bottom:1px solid var(--border);
+    vertical-align:middle;
+    white-space:nowrap;
+  }
+  tbody tr:hover{background:var(--surface-2);}
+  .rep-name{font-weight:700;color:var(--primary-dark);}
+  .num-cell{font-family:'JetBrains Mono', monospace;font-size:12.5px;color:var(--text);}
+  .num-cell.deduct{color:var(--danger);}
+  .num-cell.leave{color:var(--leave);}
+  .total-cell{font-family:'JetBrains Mono', monospace;font-weight:700;color:var(--primary);font-size:14px;}
+  .row-actions{display:flex;gap:6px;}
+  .icon-btn{
+    background:none;
+    border:1px solid var(--border-strong);
+    border-radius:7px;
+    padding:5px 9px;
+    font-size:12px;
+    font-weight:700;
+    color:var(--text-muted);
+  }
+  .icon-btn:hover{background:var(--surface-2);}
+  .icon-btn.danger{color:var(--danger);border-color:#E3BDB0;}
+  .icon-btn.danger:hover{background:var(--danger-light);}
+
+  .empty-state{
+    text-align:center;
+    padding:36px 10px;
+    color:var(--text-muted);
+    font-size:14px;
+  }
+
+  .table-scroll{overflow-x:auto;}
+
+  tfoot td{
+    padding:12px 6px;
+    font-weight:700;
+    border-top:2px solid var(--border);
+    color:var(--primary-dark);
+    white-space:nowrap;
+  }
+  tfoot .grand-total{font-family:'JetBrains Mono', monospace;color:var(--primary);font-size:15.5px;}
+
+  .status-msg{font-size:12.5px;color:var(--text-muted);margin-top:8px;min-height:16px;}
+  .status-msg.error{color:var(--danger);}
+
+  .periods-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .period-pill{
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:5px 13px;
+    font-size:12px;
+    color:var(--primary-dark);
+    cursor:pointer;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .period-pill:hover{background:var(--border);}
+  .period-pill.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="hero">
+    <div class="eyebrow">نظام مرتبات مندوبي التوصيل</div>
+    <h1>حاسبة مرتبات المندوبين</h1>
+    <p>سجّل المندوبين مرة واحدة، واختار الاسم من القايمة في كل فترة. الشهر مقسّم لـ٣ فترات كل واحدة ١٠ أيام، وبيتضاف بدل إجازات تلقائي في الفترة الثالثة، وتقدر تنزّل كل النتائج كملف إكسيل.</p>
+    <svg class="route-svg" viewBox="0 0 900 56" xmlns="http://www.w3.org/2000/svg">
+      <line x1="30" y1="30" x2="870" y2="30" stroke="#4E9484" stroke-width="2" stroke-dasharray="1 10" stroke-linecap="round"/>
+      <circle cx="70" cy="30" r="15" fill="#0A3F35" stroke="#5DCAA5" stroke-width="1.5"/>
+      <rect x="63" y="23" width="14" height="4" rx="1.5" fill="#fff"/>
+      <rect x="68" y="18" width="4" height="14" rx="1.5" fill="#fff"/>
+      <circle cx="450" cy="30" r="15" fill="#0A3F35" stroke="#5DCAA5" stroke-width="1.5"/>
+      <rect x="443" y="23" width="14" height="4" rx="1.5" fill="#fff"/>
+      <rect x="448" y="18" width="4" height="14" rx="1.5" fill="#fff"/>
+      <circle cx="830" cy="30" r="15" fill="#0A3F35" stroke="#5DCAA5" stroke-width="1.5"/>
+      <rect x="823" y="23" width="14" height="4" rx="1.5" fill="#fff"/>
+      <rect x="828" y="18" width="4" height="14" rx="1.5" fill="#fff"/>
+      <g transform="translate(230,14)">
+        <rect x="0" y="8" width="24" height="14" rx="4" fill="#C98A1F"/>
+        <circle cx="5" cy="24" r="4.5" fill="#0A3F35"/>
+        <circle cx="19" cy="24" r="4.5" fill="#0A3F35"/>
+      </g>
+      <g transform="translate(620,14)">
+        <rect x="0" y="8" width="24" height="14" rx="4" fill="#C98A1F"/>
+        <circle cx="5" cy="24" r="4.5" fill="#0A3F35"/>
+        <circle cx="19" cy="24" r="4.5" fill="#0A3F35"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="roster-panel" id="syncPanel">
+    <h2>مزامنة البيانات (Google Sheets)</h2>
+    <div class="roster-add">
+      <input type="text" id="syncUrlInput" placeholder="الصق هنا رابط Web App بتاع Google Apps Script">
+      <button type="button" id="syncConnectBtn">ربط</button>
+      <button type="button" class="btn-ghost" id="syncDisconnectBtn">فصل</button>
+    </div>
+    <div class="roster-empty" id="syncStatus">مش متصل حالياً - البيانات بتتحفظ على المتصفح ده بس.</div>
+  </div>
+
+  <div class="roster-panel">
+    <h2>المندوبين المسجلين</h2>
+    <div class="roster-add">
+      <input type="text" id="rosterInput" placeholder="اسم مندوب جديد">
+      <button type="button" id="rosterAddBtn">تسجيل مندوب</button>
+    </div>
+    <div class="roster-list" id="rosterList"></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="period-field">
+      <label for="periodInput">الشهر</label>
+      <input type="month" id="periodInput">
+      <div class="seg-tabs" id="segTabs">
+        <button type="button" class="seg-tab" data-seg="1">١ - ١٠</button>
+        <button type="button" class="seg-tab" data-seg="2">١١ - ٢٠</button>
+        <button type="button" class="seg-tab" data-seg="3">٢١ - آخر الشهر</button>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <button type="button" class="btn-export" id="exportBtn">تنزيل ملف إكسيل</button>
+      <div class="summary-chip">
+        إجمالي مرتبات الفترة: <span class="num" id="periodTotal">0.00</span> جنيه
+      </div>
+    </div>
+  </div>
+
+  <div class="leave-banner" id="leaveBanner" style="display:none;">
+    <span>هذه الفترة الثالثة: بيتضاف تلقائي <b>بدل إجازات</b> لكل مندوب = (إجمالي ساعاته في الفترات الثلاث × ٤٨ ÷ ٣١٢).</span>
+  </div>
+
+  <div class="layout">
+    <section class="panel form-panel">
+      <h2 id="formTitle">إضافة بيانات مندوب</h2>
+      <form id="repForm">
+        <div class="field">
+          <label for="f_name">المندوب</label>
+          <select id="f_name" required>
+            <option value="">اختر المندوب من القايمة</option>
+          </select>
+        </div>
+
+        <div class="group-title">ساعات العمل</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f_hours">عدد الساعات</label>
+            <input type="number" id="f_hours" min="0" step="0.5" value="0">
+          </div>
+          <div class="field">
+            <label for="f_rate">سعر الساعة (جنيه)</label>
+            <input type="number" id="f_rate" min="0" step="0.5" value="20">
+          </div>
+        </div>
+
+        <div class="group-title danger-title">خصم التأخير</div>
+        <div class="field">
+          <label for="f_late">عدد ساعات التأخير</label>
+          <input type="number" id="f_late" min="0" step="0.5" value="0">
+        </div>
+
+        <div class="group-title">عمولة التوصيل - أوردر ٢٥ جنيه</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f_del25Count">عدد الأوردرات</label>
+            <input type="number" id="f_del25Count" min="0" step="1" value="0">
+          </div>
+          <div class="field">
+            <label for="f_del25Rate">عمولة الأوردر</label>
+            <input type="number" id="f_del25Rate" min="0" step="0.5" value="25">
+          </div>
+        </div>
+
+        <div class="group-title">عمولة التوصيل - أوردر ٣٠ جنيه</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f_del30Count">عدد الأوردرات</label>
+            <input type="number" id="f_del30Count" min="0" step="1" value="0">
+          </div>
+          <div class="field">
+            <label for="f_del30Rate">عمولة الأوردر</label>
+            <input type="number" id="f_del30Rate" min="0" step="0.5" value="30">
+          </div>
+        </div>
+
+        <div class="group-title">عمولة التحويل بين الصيدليات</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f_trCount">عدد عمليات التحويل</label>
+            <input type="number" id="f_trCount" min="0" step="1" value="0">
+          </div>
+          <div class="field">
+            <label for="f_trRate">عمولة العملية (جنيه)</label>
+            <input type="number" id="f_trRate" min="0" step="0.5" value="25">
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn-primary" id="submitBtn">إضافة</button>
+          <button type="button" class="btn-ghost" id="cancelEditBtn" style="display:none;">إلغاء</button>
+        </div>
+        <div class="status-msg" id="statusMsg"></div>
+      </form>
+    </section>
+
+    <section class="panel table-panel">
+      <h2>مندوبو الفترة الحالية</h2>
+      <div class="table-scroll" id="tableWrap"></div>
+      <div class="group-title" style="margin-top:20px;">فترات محفوظة سابقاً</div>
+      <div class="periods-list" id="periodsList"></div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+let REMOTE_URL = localStorage.getItem('apps-script-url') || '';
+
+function localGet(key){
+  const v = localStorage.getItem(key);
+  return v !== null ? {key, value: v, shared: false} : null;
+}
+function localSet(key, value){
+  localStorage.setItem(key, value);
+  return {key, value, shared: false};
+}
+function localDelete(key){
+  localStorage.removeItem(key);
+  return {key, deleted: true, shared: false};
+}
+function localList(prefix){
+  const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix || '') && k !== 'apps-script-url');
+  return {keys, prefix, shared: false};
+}
+
+const storage = {
+  async get(key){
+    if(!REMOTE_URL) return localGet(key);
+    try{
+      const res = await fetch(REMOTE_URL + '?action=get&key=' + encodeURIComponent(key));
+      const data = await res.json();
+      return data.found ? {key, value: data.value, shared: false} : null;
+    }catch(e){
+      setSyncStatus('حصل خطأ في الاتصال بجوجل شيت، البيانات هتتحفظ محليًا مؤقتًا.', true);
+      return localGet(key);
+    }
+  },
+  async set(key, value){
+    if(!REMOTE_URL) return localSet(key, value);
+    try{
+      await fetch(REMOTE_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action:'set', key, value})
+      });
+      return {key, value, shared: false};
+    }catch(e){
+      setSyncStatus('حصل خطأ في الاتصال بجوجل شيت، البيانات هتتحفظ محليًا مؤقتًا.', true);
+      return localSet(key, value);
+    }
+  },
+  async delete(key){
+    if(!REMOTE_URL) return localDelete(key);
+    try{
+      await fetch(REMOTE_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action:'delete', key})
+      });
+      return {key, deleted: true, shared: false};
+    }catch(e){
+      return localDelete(key);
+    }
+  },
+  async list(prefix){
+    if(!REMOTE_URL) return localList(prefix);
+    try{
+      const res = await fetch(REMOTE_URL + '?action=list&prefix=' + encodeURIComponent(prefix || ''));
+      const data = await res.json();
+      return {keys: data.keys || [], prefix, shared: false};
+    }catch(e){
+      setSyncStatus('حصل خطأ في الاتصال بجوجل شيت، البيانات هتتحفظ محليًا مؤقتًا.', true);
+      return localList(prefix);
+    }
+  }
+};
+
+function setSyncStatus(msg, isError){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : '';
+}
+
+async function testAndSetRemote(url){
+  setSyncStatus('جاري التأكد من الاتصال...', false);
+  try{
+    const res = await fetch(url + '?action=list&prefix=');
+    const data = await res.json();
+    if(!data || !Array.isArray(data.keys)){
+      throw new Error('bad response');
+    }
+    REMOTE_URL = url;
+    localStorage.setItem('apps-script-url', url);
+    setSyncStatus('متصل بجوجل شيت. البيانات دلوقتي هتتزامن أونلاين.', false);
+    return true;
+  }catch(e){
+    setSyncStatus('مقدرتش أتأكد من الرابط. تأكد إنه رابط Web App صحيح ومنشور بصلاحية "Anyone".', true);
+    return false;
+  }
+}
+
+function disconnectRemote(){
+  REMOTE_URL = '';
+  localStorage.removeItem('apps-script-url');
+  setSyncStatus('اتفصل. البيانات دلوقتي بتتحفظ على المتصفح ده بس.', false);
+}
+
+let currentMonth = '';
+let currentSeg = 1;
+let reps = [];
+let roster = [];
+let editingId = null;
+let priorHoursMap = {};
+
+function money(n){
+  return (Math.round(n * 100) / 100).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function isSeg3(){ return currentSeg === 3; }
+
+function repLeaveHours(r, priorMap){
+  const prior = (priorMap || priorHoursMap)[r.name] || 0;
+  return prior + (r.hours || 0);
+}
+
+function repLeaveAllowance(r, seg, priorMap){
+  if(seg !== 3) return 0;
+  return repLeaveHours(r, priorMap) * 48 / 312;
+}
+
+function repTotal(r){
+  const hoursPay = (r.hours - r.late) * r.rate;
+  const del25 = r.del25Count * r.del25Rate;
+  const del30 = r.del30Count * r.del30Rate;
+  const transfer = r.trCount * r.trRate;
+  const leave = repLeaveAllowance(r, currentSeg, priorHoursMap);
+  return hoursPay + del25 + del30 + transfer + leave;
+}
+
+function periodKey(month, seg){ return 'payroll:' + month + ':' + seg; }
+const ROSTER_KEY = 'delivery-roster';
+
+function defaultMonth(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  return y + '-' + m;
+}
+
+async function fetchPeriodReps(month, seg){
+  try{
+    const result = await storage.get(periodKey(month, seg), false);
+    return result && result.value ? JSON.parse(result.value) : [];
+  }catch(e){
+    return [];
+  }
+}
+
+async function buildPriorHoursMap(month){
+  const map = {};
+  const p1 = await fetchPeriodReps(month, 1);
+  const p2 = await fetchPeriodReps(month, 2);
+  [...p1, ...p2].forEach(r=>{
+    map[r.name] = (map[r.name] || 0) + (r.hours || 0);
+  });
+  return map;
+}
+
+async function loadRoster(){
+  try{
+    const result = await storage.get(ROSTER_KEY, false);
+    roster = result && result.value ? JSON.parse(result.value) : [];
+  }catch(e){
+    roster = [];
+  }
+  renderRoster();
+}
+
+async function saveRoster(){
+  try{
+    await storage.set(ROSTER_KEY, JSON.stringify(roster), false);
+  }catch(e){
+    setStatus('حصل خطأ أثناء حفظ قايمة المندوبين.', true);
+  }
+}
+
+function renderRoster(){
+  const listEl = document.getElementById('rosterList');
+  if(roster.length === 0){
+    listEl.innerHTML = '<span class="roster-empty">لسه مفيش مندوبين مسجلين. سجّل أول مندوب من فوق.</span>';
+  }else{
+    listEl.innerHTML = roster.map(m=>
+      `<span class="roster-chip">${escapeHtml(m.name)}<button type="button" data-remove-roster="${m.id}" aria-label="حذف">×</button></span>`
+    ).join('');
+    listEl.querySelectorAll('[data-remove-roster]').forEach(btn=>{
+      btn.addEventListener('click', ()=> removeRosterMember(btn.getAttribute('data-remove-roster')));
+    });
+  }
+  const select = document.getElementById('f_name');
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">اختر المندوب من القايمة</option>' +
+    roster.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('');
+  if(roster.some(m=>m.name === currentVal)){
+    select.value = currentVal;
+  }
+}
+
+async function addRosterMember(name){
+  if(roster.some(m=>m.name === name)){
+    setStatus('المندوب ده مسجل بالفعل.', true);
+    return;
+  }
+  roster.push({id: 'm' + Date.now() + Math.floor(Math.random()*1000), name});
+  renderRoster();
+  await saveRoster();
+  setStatus('تم تسجيل المندوب.', false);
+}
+
+async function removeRosterMember(id){
+  roster = roster.filter(m=>m.id !== id);
+  renderRoster();
+  await saveRoster();
+  setStatus('تم حذف المندوب من قايمة التسجيل. بيانات فتراته السابقة اتحفظت زي ما هي.', false);
+}
+
+async function loadPeriod(month, seg){
+  currentMonth = month;
+  currentSeg = seg;
+  document.getElementById('periodInput').value = month;
+  document.querySelectorAll('.seg-tab').forEach(t=>{
+    t.classList.toggle('active', Number(t.getAttribute('data-seg')) === seg);
+  });
+  document.getElementById('leaveBanner').style.display = isSeg3() ? 'flex' : 'none';
+
+  reps = await fetchPeriodReps(month, seg);
+  priorHoursMap = isSeg3() ? await buildPriorHoursMap(month) : {};
+
+  render();
+  await refreshPeriodsList();
+}
+
+async function saveReps(){
+  try{
+    const result = await storage.set(periodKey(currentMonth, currentSeg), JSON.stringify(reps), false);
+    if(!result){
+      setStatus('حصل خطأ أثناء الحفظ، حاول تاني.', true);
+    }
+  }catch(e){
+    setStatus('حصل خطأ أثناء الحفظ، حاول تاني.', true);
+  }
+}
+
+function setStatus(msg, isError){
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg || '';
+  el.className = 'status-msg' + (isError ? ' error' : '');
+  if(msg && !isError){
+    setTimeout(()=>{ if(el.textContent === msg) el.textContent=''; }, 2500);
+  }
+}
+
+function render(){
+  const wrap = document.getElementById('tableWrap');
+  if(reps.length === 0){
+    wrap.innerHTML = '<div class="empty-state">لسه مفيش مندوبين مضافين للفترة دي. أضف بيانات مندوب من النموذج.</div>';
+    document.getElementById('periodTotal').textContent = '0.00';
+    return;
+  }
+  let grand = 0;
+  let rows = '';
+  reps.forEach(r=>{
+    const t = repTotal(r);
+    grand += t;
+    const leaveCell = isSeg3() ? `<td class="num-cell leave">${money(repLeaveAllowance(r, currentSeg, priorHoursMap))}</td>` : '';
+    rows += `<tr>
+      <td class="rep-name">${escapeHtml(r.name)}</td>
+      <td class="num-cell">${r.hours} × ${money(r.rate)}</td>
+      <td class="num-cell deduct">${r.late} س</td>
+      <td class="num-cell">${r.del25Count} × ${money(r.del25Rate)}</td>
+      <td class="num-cell">${r.del30Count} × ${money(r.del30Rate)}</td>
+      <td class="num-cell">${r.trCount} × ${money(r.trRate)}</td>
+      ${leaveCell}
+      <td class="total-cell">${money(t)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn" data-edit="${r.id}">تعديل</button>
+          <button class="icon-btn danger" data-del="${r.id}">حذف</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+  const leaveHeader = isSeg3() ? '<th>بدل إجازات</th>' : '';
+  const leaveFooterCol = isSeg3() ? '<td></td>' : '';
+  wrap.innerHTML = `<table>
+    <thead>
+      <tr>
+        <th>المندوب</th>
+        <th>الساعات</th>
+        <th>التأخير</th>
+        <th>توصيل ٢٥</th>
+        <th>توصيل ٣٠</th>
+        <th>التحويل</th>
+        ${leaveHeader}
+        <th>الإجمالي</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="${isSeg3() ? 6 : 5}">إجمالي مرتبات الفترة</td>
+        ${leaveFooterCol}
+        <td class="grand-total">${money(grand)}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>`;
+  document.getElementById('periodTotal').textContent = money(grand);
+
+  wrap.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.addEventListener('click', ()=> startEdit(btn.getAttribute('data-edit')));
+  });
+  wrap.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteRep(btn.getAttribute('data-del')));
+  });
+}
+
+function escapeHtml(s){
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function startEdit(id){
+  const r = reps.find(x=>x.id === id);
+  if(!r) return;
+  editingId = id;
+  const select = document.getElementById('f_name');
+  if(![...select.options].some(o=>o.value === r.name)){
+    const opt = document.createElement('option');
+    opt.value = r.name;
+    opt.textContent = r.name + ' (مش مسجل حالياً)';
+    select.appendChild(opt);
+  }
+  select.value = r.name;
+  document.getElementById('f_hours').value = r.hours;
+  document.getElementById('f_rate').value = r.rate;
+  document.getElementById('f_late').value = r.late;
+  document.getElementById('f_del25Count').value = r.del25Count;
+  document.getElementById('f_del25Rate').value = r.del25Rate;
+  document.getElementById('f_del30Count').value = r.del30Count;
+  document.getElementById('f_del30Rate').value = r.del30Rate;
+  document.getElementById('f_trCount').value = r.trCount;
+  document.getElementById('f_trRate').value = r.trRate;
+  document.getElementById('formTitle').textContent = 'تعديل بيانات المندوب';
+  document.getElementById('submitBtn').textContent = 'حفظ التعديل';
+  document.getElementById('cancelEditBtn').style.display = 'inline-block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function resetForm(){
+  editingId = null;
+  document.getElementById('repForm').reset();
+  document.getElementById('f_rate').value = 20;
+  document.getElementById('f_del25Rate').value = 25;
+  document.getElementById('f_del30Rate').value = 30;
+  document.getElementById('f_trRate').value = 25;
+  document.getElementById('formTitle').textContent = 'إضافة بيانات مندوب';
+  document.getElementById('submitBtn').textContent = 'إضافة';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  renderRoster();
+}
+
+async function deleteRep(id){
+  reps = reps.filter(r=>r.id !== id);
+  render();
+  await saveReps();
+  setStatus('تم حذف السجل.', false);
+}
+
+async function refreshPeriodsList(){
+  const listEl = document.getElementById('periodsList');
+  try{
+    const result = await storage.list('payroll:', false);
+    const keys = (result && result.keys) ? result.keys : [];
+    if(keys.length === 0){
+      listEl.innerHTML = '';
+      return;
+    }
+    const segLabel = {1:'ف١', 2:'ف٢', 3:'ف٣'};
+    const parsed = keys.map(k=>{
+      const parts = k.replace('payroll:', '').split(':');
+      return {month: parts[0], seg: Number(parts[1]), key:k};
+    }).sort((a,b)=> (b.month+b.seg).localeCompare(a.month+a.seg));
+    listEl.innerHTML = parsed.map(p=>
+      `<span class="period-pill ${p.month===currentMonth && p.seg===currentSeg ? 'active':''}" data-month="${p.month}" data-seg="${p.seg}">${p.month} · ${segLabel[p.seg]}</span>`
+    ).join('');
+    listEl.querySelectorAll('[data-month]').forEach(pill=>{
+      pill.addEventListener('click', ()=> loadPeriod(pill.getAttribute('data-month'), Number(pill.getAttribute('data-seg'))));
+    });
+  }catch(e){
+    listEl.innerHTML = '';
+  }
+}
+
+async function exportExcel(){
+  if(typeof XLSX === 'undefined'){
+    setStatus('مكتبة التصدير لسه بتحمّل، جرب تاني بعد شوية.', true);
+    return;
+  }
+  let keys = [];
+  try{
+    const result = await storage.list('payroll:', false);
+    keys = (result && result.keys) ? result.keys : [];
+  }catch(e){
+    keys = [];
+  }
+  if(keys.length === 0){
+    setStatus('مفيش بيانات محفوظة عشان تتصدّر.', true);
+    return;
+  }
+  setStatus('جاري تجهيز ملف الإكسيل...', false);
+  const segLabel = {1:'ف1', 2:'ف2', 3:'ف3'};
+  const parsed = keys.map(k=>{
+    const parts = k.replace('payroll:', '').split(':');
+    return {month: parts[0], seg: Number(parts[1])};
+  }).sort((a,b)=> (a.month+a.seg).localeCompare(b.month+b.seg));
+
+  const wb = XLSX.utils.book_new();
+  const monthCache = {};
+
+  for(const p of parsed){
+    const repsData = await fetchPeriodReps(p.month, p.seg);
+    if(repsData.length === 0) continue;
+    let priorMap = {};
+    if(p.seg === 3){
+      if(!monthCache[p.month]) monthCache[p.month] = await buildPriorHoursMap(p.month);
+      priorMap = monthCache[p.month];
+    }
+    const rows = repsData.map(r=>{
+      const leave = repLeaveAllowance(r, p.seg, priorMap);
+      const total = (r.hours - r.late) * r.rate + r.del25Count * r.del25Rate + r.del30Count * r.del30Rate + r.trCount * r.trRate + leave;
+      return {
+        'المندوب': r.name,
+        'الساعات': r.hours,
+        'سعر الساعة': r.rate,
+        'ساعات التأخير': r.late,
+        'عدد أوردر 25': r.del25Count,
+        'عمولة أوردر 25': r.del25Rate,
+        'عدد أوردر 30': r.del30Count,
+        'عمولة أوردر 30': r.del30Rate,
+        'عدد التحويلات': r.trCount,
+        'عمولة التحويل': r.trRate,
+        'بدل إجازات': Math.round(leave * 100) / 100,
+        'الإجمالي': Math.round(total * 100) / 100
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const sheetName = (p.month + '_' + segLabel[p.seg]).substring(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  }
+
+  XLSX.writeFile(wb, 'مرتبات-المندوبين.xlsx');
+  setStatus('تم تنزيل ملف الإكسيل.', false);
+}
+
+document.getElementById('rosterAddBtn').addEventListener('click', async ()=>{
+  const input = document.getElementById('rosterInput');
+  const name = input.value.trim();
+  if(!name){
+    setStatus('اكتب اسم المندوب الأول.', true);
+    return;
+  }
+  await addRosterMember(name);
+  input.value = '';
+});
+document.getElementById('rosterInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    document.getElementById('rosterAddBtn').click();
+  }
+});
+
+document.getElementById('repForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('f_name').value;
+  if(!name){
+    setStatus('من فضلك اختار المندوب من القايمة.', true);
+    return;
+  }
+  const data = {
+    id: editingId || ('r' + Date.now() + Math.floor(Math.random()*1000)),
+    name,
+    hours: parseFloat(document.getElementById('f_hours').value) || 0,
+    rate: parseFloat(document.getElementById('f_rate').value) || 0,
+    late: parseFloat(document.getElementById('f_late').value) || 0,
+    del25Count: parseFloat(document.getElementById('f_del25Count').value) || 0,
+    del25Rate: parseFloat(document.getElementById('f_del25Rate').value) || 0,
+    del30Count: parseFloat(document.getElementById('f_del30Count').value) || 0,
+    del30Rate: parseFloat(document.getElementById('f_del30Rate').value) || 0,
+    trCount: parseFloat(document.getElementById('f_trCount').value) || 0,
+    trRate: parseFloat(document.getElementById('f_trRate').value) || 0,
+  };
+  if(editingId){
+    reps = reps.map(r=> r.id === editingId ? data : r);
+  }else{
+    reps.push(data);
+  }
+  render();
+  await saveReps();
+  setStatus(editingId ? 'تم حفظ التعديل.' : 'تمت الإضافة.', false);
+  resetForm();
+});
+
+document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
+document.getElementById('exportBtn').addEventListener('click', exportExcel);
+
+document.getElementById('periodInput').addEventListener('change', (e)=>{
+  loadPeriod(e.target.value, currentSeg);
+});
+
+document.getElementById('segTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.seg-tab');
+  if(!btn) return;
+  loadPeriod(currentMonth, Number(btn.getAttribute('data-seg')));
+});
+
+document.getElementById('syncConnectBtn').addEventListener('click', async ()=>{
+  const url = document.getElementById('syncUrlInput').value.trim();
+  if(!url){
+    setSyncStatus('الصق رابط Web App الأول.', true);
+    return;
+  }
+  const ok = await testAndSetRemote(url);
+  if(ok){
+    await loadRoster();
+    await loadPeriod(currentMonth, currentSeg);
+  }
+});
+
+document.getElementById('syncDisconnectBtn').addEventListener('click', async ()=>{
+  disconnectRemote();
+  await loadRoster();
+  await loadPeriod(currentMonth, currentSeg);
+});
+
+(async function init(){
+  if(REMOTE_URL){
+    document.getElementById('syncUrlInput').value = REMOTE_URL;
+    setSyncStatus('متصل بجوجل شيت. البيانات دلوقتي بتتزامن أونلاين.', false);
+  }
+  await loadRoster();
+  await loadPeriod(defaultMonth(), 1);
+})();
+</script>
+
+</body>
+</html>
