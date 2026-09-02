@@ -623,7 +623,7 @@ function repLeaveHours(r, priorMap){
 
 function repLeaveAllowance(r, seg, priorMap){
   if(seg !== 3) return 0;
-  return repLeaveHours(r, priorMap) * 48 / 312;
+  return repLeaveHours(r, priorMap) * 48*25 / 312;
 }
 
 function repTotal(r){
