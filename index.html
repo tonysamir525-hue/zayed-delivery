@@ -382,8 +382,10 @@
       <input type="text" id="syncUrlInput" placeholder="الصق هنا رابط Web App بتاع Google Apps Script">
       <button type="button" id="syncConnectBtn">ربط</button>
       <button type="button" class="btn-ghost" id="syncDisconnectBtn">فصل</button>
+      <button type="button" class="btn-ghost" id="syncRefreshBtn">تحديث</button>
     </div>
     <div class="roster-empty" id="syncStatus">مش متصل حالياً - البيانات بتتحفظ على المتصفح ده بس.</div>
+    <div class="roster-empty" id="saveState"></div>
   </div>
 
   <div class="roster-panel">
@@ -502,7 +504,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 let REMOTE_URL = localStorage.getItem('apps-script-url') || '';
+const MIRROR_KEY = 'remote-cache-v1';
+const CONNECTED_MSG = 'متصل بجوجل شيت. البيانات بتتزامن أونلاين.';
 
+// ---------- تخزين محلي (لما مفيش ربط بجوجل شيت) ----------
 function localGet(key){
   const v = localStorage.getItem(key);
   return v !== null ? {key, value: v, shared: false} : null;
@@ -516,59 +521,150 @@ function localDelete(key){
   return {key, deleted: true, shared: false};
 }
 function localList(prefix){
-  const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix || '') && k !== 'apps-script-url');
+  const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix || '') && k !== 'apps-script-url' && k !== MIRROR_KEY);
   return {keys, prefix, shared: false};
+}
+
+// ---------- وضع جوجل شيت: كل البيانات بتتحمّل مرة واحدة في الذاكرة ----------
+// القراءة فورية من الذاكرة، والحفظ بيتم في الخلفية من غير ما الشاشة تستنى.
+let cache = {};
+let remoteReady = false;
+let pendingWrites = 0;
+let writeChain = Promise.resolve();
+let failedWrites = [];
+let writeVersion = 0;
+let lastSync = 0;
+
+function saveMirror(){
+  try{ localStorage.setItem(MIRROR_KEY, JSON.stringify(cache)); }catch(e){}
+}
+function loadMirror(){
+  try{
+    const m = localStorage.getItem(MIRROR_KEY);
+    return m ? JSON.parse(m) : null;
+  }catch(e){ return null; }
+}
+function stable(o){
+  return JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]]));
+}
+
+function setSaveState(){
+  const el = document.getElementById('saveState');
+  if(!el) return;
+  if(!REMOTE_URL){ el.textContent = ''; el.style.color = ''; return; }
+  if(pendingWrites > 0){
+    el.textContent = '⏳ جاري الحفظ على جوجل شيت...';
+    el.style.color = '';
+  }else if(failedWrites.length > 0){
+    el.textContent = '⚠ فيه تعديلات لسه متحفظتش أونلاين. اتأكد من النت وداوس "تحديث" عشان يعيد المحاولة.';
+    el.style.color = 'var(--danger)';
+  }else{
+    el.textContent = '✓ كل التعديلات محفوظة';
+    el.style.color = '';
+  }
+}
+
+function enqueueWrite(body){
+  pendingWrites++;
+  setSaveState();
+  writeChain = writeChain.then(async ()=>{
+    let ok = false;
+    for(let i = 0; i < 3 && !ok; i++){
+      try{
+        await fetch(REMOTE_URL, {
+          method: 'POST',
+          headers: {'Content-Type': 'text/plain;charset=utf-8'},
+          body: JSON.stringify(body)
+        });
+        ok = true;
+      }catch(e){
+        await new Promise(r => setTimeout(r, 700 * (i + 1)));
+      }
+    }
+    if(!ok) failedWrites.push(body.key);
+  }).then(()=>{
+    pendingWrites--;
+    setSaveState();
+  });
+}
+
+function flushFailed(){
+  const keys = [...new Set(failedWrites)];
+  failedWrites = [];
+  keys.forEach(key=>{
+    if(key in cache) enqueueWrite({action:'set', key, value: cache[key]});
+    else enqueueWrite({action:'delete', key});
+  });
+}
+
+async function remoteFetchAll(){
+  const res = await fetch(REMOTE_URL + '?action=all');
+  const data = await res.json();
+  if(data && data.items){
+    const out = {};
+    Object.keys(data.items).forEach(k => out[k] = String(data.items[k]));
+    return out;
+  }
+  // سيرفر قديم (Code.gs لسه متحدّثش): نجيب كل المفاتيح بالتوازي
+  const l = await (await fetch(REMOTE_URL + '?action=list&prefix=')).json();
+  if(!l || !Array.isArray(l.keys)) throw new Error('bad response');
+  const out = {};
+  await Promise.all(l.keys.map(async k=>{
+    const r = await (await fetch(REMOTE_URL + '?action=get&key=' + encodeURIComponent(k))).json();
+    if(r && r.found) out[k] = String(r.value);
+  }));
+  return out;
+}
+
+// بترجّع true لو البيانات اتغيّرت عن اللي في الذاكرة
+async function syncFromRemote(){
+  if(!REMOTE_URL) return false;
+  if(failedWrites.length) flushFailed();
+  if(pendingWrites > 0) return false;           // فيه حفظ شغال، مش هنكتب فوقه
+  const versionBefore = writeVersion;
+  const items = await remoteFetchAll();
+  if(writeVersion !== versionBefore || pendingWrites > 0) return false; // حصل تعديل أثناء التحميل
+  const firstLoad = !remoteReady;
+  remoteReady = true;
+  lastSync = Date.now();
+  if(firstLoad || stable(items) !== stable(cache)){
+    cache = items;
+    saveMirror();
+    return true;
+  }
+  return false;
 }
 
 const storage = {
   async get(key){
     if(!REMOTE_URL) return localGet(key);
-    try{
-      const res = await fetch(REMOTE_URL + '?action=get&key=' + encodeURIComponent(key));
-      const data = await res.json();
-      return data.found ? {key, value: data.value, shared: false} : null;
-    }catch(e){
-      setSyncStatus('حصل خطأ في الاتصال بجوجل شيت، البيانات هتتحفظ محليًا مؤقتًا.', true);
-      return localGet(key);
-    }
+    return (key in cache) ? {key, value: cache[key], shared: false} : null;
   },
   async set(key, value){
     if(!REMOTE_URL) return localSet(key, value);
-    try{
-      await fetch(REMOTE_URL, {
-        method: 'POST',
-        headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({action:'set', key, value})
-      });
-      return {key, value, shared: false};
-    }catch(e){
-      setSyncStatus('حصل خطأ في الاتصال بجوجل شيت، البيانات هتتحفظ محليًا مؤقتًا.', true);
-      return localSet(key, value);
+    if(!remoteReady){
+      setSyncStatus('مقدرش أحفظ لأن تحميل البيانات من جوجل شيت لسه ماتمش. داوس "تحديث" وجرب تاني.', true);
+      return null;
     }
+    cache[key] = value;
+    writeVersion++;
+    saveMirror();
+    enqueueWrite({action:'set', key, value});
+    return {key, value, shared: false};
   },
   async delete(key){
     if(!REMOTE_URL) return localDelete(key);
-    try{
-      await fetch(REMOTE_URL, {
-        method: 'POST',
-        headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({action:'delete', key})
-      });
-      return {key, deleted: true, shared: false};
-    }catch(e){
-      return localDelete(key);
-    }
+    if(!remoteReady) return null;
+    delete cache[key];
+    writeVersion++;
+    saveMirror();
+    enqueueWrite({action:'delete', key});
+    return {key, deleted: true, shared: false};
   },
   async list(prefix){
     if(!REMOTE_URL) return localList(prefix);
-    try{
-      const res = await fetch(REMOTE_URL + '?action=list&prefix=' + encodeURIComponent(prefix || ''));
-      const data = await res.json();
-      return {keys: data.keys || [], prefix, shared: false};
-    }catch(e){
-      setSyncStatus('حصل خطأ في الاتصال بجوجل شيت، البيانات هتتحفظ محليًا مؤقتًا.', true);
-      return localList(prefix);
-    }
+    const keys = Object.keys(cache).filter(k => k.startsWith(prefix || ''));
+    return {keys, prefix, shared: false};
   }
 };
 
@@ -580,18 +676,22 @@ function setSyncStatus(msg, isError){
 }
 
 async function testAndSetRemote(url){
-  setSyncStatus('جاري التأكد من الاتصال...', false);
+  setSyncStatus('جاري الاتصال وتحميل البيانات...', false);
+  const prevUrl = REMOTE_URL;
   try{
-    const res = await fetch(url + '?action=list&prefix=');
-    const data = await res.json();
-    if(!data || !Array.isArray(data.keys)){
-      throw new Error('bad response');
-    }
     REMOTE_URL = url;
+    const items = await remoteFetchAll();
+    cache = items;
+    remoteReady = true;
+    failedWrites = [];
+    lastSync = Date.now();
     localStorage.setItem('apps-script-url', url);
-    setSyncStatus('متصل بجوجل شيت. البيانات دلوقتي هتتزامن أونلاين.', false);
+    saveMirror();
+    setSyncStatus(CONNECTED_MSG, false);
+    setSaveState();
     return true;
   }catch(e){
+    REMOTE_URL = prevUrl;
     setSyncStatus('مقدرتش أتأكد من الرابط. تأكد إنه رابط Web App صحيح ومنشور بصلاحية "Anyone".', true);
     return false;
   }
@@ -599,9 +699,44 @@ async function testAndSetRemote(url){
 
 function disconnectRemote(){
   REMOTE_URL = '';
+  cache = {};
+  remoteReady = false;
+  failedWrites = [];
   localStorage.removeItem('apps-script-url');
+  localStorage.removeItem(MIRROR_KEY);
   setSyncStatus('اتفصل. البيانات دلوقتي بتتحفظ على المتصفح ده بس.', false);
+  setSaveState();
 }
+
+async function refreshFromRemote(manual){
+  if(!REMOTE_URL) return;
+  try{
+    const changed = await syncFromRemote();
+    if(changed){
+      if(editingId === null) await loadRoster();
+      await loadPeriod(currentMonth, currentSeg);
+    }
+    setSyncStatus(CONNECTED_MSG, false);
+    if(manual && failedWrites.length === 0 && pendingWrites === 0) setSaveState();
+  }catch(e){
+    setSyncStatus('مقدرتش أحدّث من جوجل شيت دلوقتي. هيتحاول تاني تلقائي.', true);
+  }
+}
+
+window.addEventListener('beforeunload', (e)=>{
+  if(pendingWrites > 0 || failedWrites.length > 0){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && REMOTE_URL && Date.now() - lastSync > 15000){
+    refreshFromRemote(false);
+  }
+});
+setInterval(()=>{
+  if(document.visibilityState === 'visible' && REMOTE_URL) refreshFromRemote(false);
+}, 60000);
 
 let currentMonth = '';
 let currentSeg = 1;
@@ -1054,13 +1189,38 @@ document.getElementById('syncDisconnectBtn').addEventListener('click', async ()=
   await loadPeriod(currentMonth, currentSeg);
 });
 
+document.getElementById('syncRefreshBtn').addEventListener('click', ()=> refreshFromRemote(true));
+
 (async function init(){
   if(REMOTE_URL){
     document.getElementById('syncUrlInput').value = REMOTE_URL;
-    setSyncStatus('متصل بجوجل شيت. البيانات دلوقتي بتتزامن أونلاين.', false);
+    const mirror = loadMirror();
+    if(mirror){
+      // فتح فوري من آخر نسخة محفوظة، وبعدها تحديث هادي في الخلفية
+      cache = mirror;
+      remoteReady = true;
+      setSyncStatus(CONNECTED_MSG, false);
+      await loadRoster();
+      await loadPeriod(defaultMonth(), 1);
+      setSaveState();
+      refreshFromRemote(false);
+      return;
+    }
+    setSyncStatus('جاري تحميل البيانات من جوجل شيت (أول مرة بس)...', false);
+    try{
+      cache = await remoteFetchAll();
+      remoteReady = true;
+      lastSync = Date.now();
+      saveMirror();
+      setSyncStatus(CONNECTED_MSG, false);
+    }catch(e){
+      cache = {};
+      setSyncStatus('مقدرتش أحمّل البيانات من جوجل شيت. اتأكد من النت وداوس "تحديث".', true);
+    }
   }
   await loadRoster();
   await loadPeriod(defaultMonth(), 1);
+  setSaveState();
 })();
 </script>
 
