@@ -484,6 +484,18 @@
           </div>
         </div>
 
+        <div class="group-title">حوافز انستاشوب</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f_instaCount">عدد الأوردرات</label>
+            <input type="number" id="f_instaCount" min="0" step="1" value="">
+          </div>
+          <div class="field">
+            <label for="f_instaRate">الحافز للأوردر (جنيه)</label>
+            <input type="number" id="f_instaRate" min="0" step="any" value="2.5">
+          </div>
+        </div>
+
         <div class="btn-row">
           <button type="submit" class="btn-primary" id="submitBtn">إضافة</button>
           <button type="button" class="btn-ghost" id="cancelEditBtn" style="display:none;">إلغاء</button>
@@ -771,13 +783,19 @@ function del25Pay(r){
   return base * r.del25Rate + over * DEL25_OVER_RATE;
 }
 
+// حوافز انستاشوب: عدد الأوردرات × الحافز (افتراضي 2.5 جنيه). السجلات القديمة من غير الخانة دي بتتحسب صفر.
+const INSTA_DEFAULT_RATE = 2.5;
+function instaPay(r){
+  return (r.instaCount || 0) * (r.instaRate ?? INSTA_DEFAULT_RATE);
+}
+
 function repTotal(r){
   const hoursPay = (r.hours - r.late) * r.rate;
   const del25 = del25Pay(r);
   const del30 = r.del30Count * r.del30Rate;
   const transfer = r.trCount * r.trRate;
   const leave = repLeaveAllowance(r, currentSeg, priorHoursMap);
-  return hoursPay + del25 + del30 + transfer + leave;
+  return hoursPay + del25 + del30 + transfer + instaPay(r) + leave;
 }
 
 function periodKey(month, seg){ return 'payroll:' + month + ':' + seg; }
@@ -924,6 +942,7 @@ function render(){
         : `${r.del25Count} × ${money(r.del25Rate)}`}</td>
       <td class="num-cell">${r.del30Count} × ${money(r.del30Rate)}</td>
       <td class="num-cell">${r.trCount} × ${money(r.trRate)}</td>
+      <td class="num-cell">${r.instaCount || 0} × ${money(r.instaRate ?? INSTA_DEFAULT_RATE)}</td>
       ${leaveCell}
       <td class="total-cell">${money(t)}</td>
       <td>
@@ -945,6 +964,7 @@ function render(){
         <th>توصيل ٢٥</th>
         <th>توصيل ٣٠</th>
         <th>التحويل</th>
+        <th>حوافز انستاشوب</th>
         ${leaveHeader}
         <th>الإجمالي</th>
         <th></th>
@@ -953,7 +973,7 @@ function render(){
     <tbody>${rows}</tbody>
     <tfoot>
       <tr>
-        <td colspan="${isSeg3() ? 6 : 5}">إجمالي مرتبات الفترة</td>
+        <td colspan="${isSeg3() ? 7 : 6}">إجمالي مرتبات الفترة</td>
         ${leaveFooterCol}
         <td class="grand-total">${money(grand)}</td>
         <td></td>
@@ -997,6 +1017,8 @@ function startEdit(id){
   document.getElementById('f_del30Rate').value = r.del30Rate;
   document.getElementById('f_trCount').value = r.trCount;
   document.getElementById('f_trRate').value = r.trRate;
+  document.getElementById('f_instaCount').value = r.instaCount || '';
+  document.getElementById('f_instaRate').value = r.instaRate ?? INSTA_DEFAULT_RATE;
   document.getElementById('formTitle').textContent = 'تعديل بيانات المندوب';
   document.getElementById('submitBtn').textContent = 'حفظ التعديل';
   document.getElementById('cancelEditBtn').style.display = 'inline-block';
@@ -1010,6 +1032,7 @@ function resetForm(){
   document.getElementById('f_del25Rate').value = 25;
   document.getElementById('f_del30Rate').value = 30;
   document.getElementById('f_trRate').value = 25;
+  document.getElementById('f_instaRate').value = INSTA_DEFAULT_RATE;
   document.getElementById('formTitle').textContent = 'إضافة بيانات مندوب';
   document.getElementById('submitBtn').textContent = 'إضافة';
   document.getElementById('cancelEditBtn').style.display = 'none';
@@ -1084,7 +1107,7 @@ async function exportExcel(){
     }
     const rows = repsData.map(r=>{
       const leave = repLeaveAllowance(r, p.seg, priorMap);
-      const total = (r.hours - r.late) * r.rate + del25Pay(r) + r.del30Count * r.del30Rate + r.trCount * r.trRate + leave;
+      const total = (r.hours - r.late) * r.rate + del25Pay(r) + r.del30Count * r.del30Rate + r.trCount * r.trRate + instaPay(r) + leave;
       return {
         'المندوب': r.name,
         'الساعات': r.hours,
@@ -1096,6 +1119,9 @@ async function exportExcel(){
         'عمولة أوردر 30': r.del30Rate,
         'عدد التحويلات': r.trCount,
         'عمولة التحويل': r.trRate,
+        'عدد أوردرات انستاشوب': r.instaCount || 0,
+        'حافز الأوردر (انستاشوب)': r.instaRate ?? INSTA_DEFAULT_RATE,
+        'حوافز انستاشوب': Math.round(instaPay(r) * 100) / 100,
         'بدل إجازات': Math.round(leave * 100) / 100,
         'الإجمالي': Math.round(total * 100) / 100
       };
@@ -1145,6 +1171,8 @@ document.getElementById('repForm').addEventListener('submit', async (e)=>{
     del30Rate: parseFloat(document.getElementById('f_del30Rate').value) || 0,
     trCount: parseFloat(document.getElementById('f_trCount').value) || 0,
     trRate: parseFloat(document.getElementById('f_trRate').value) || 0,
+    instaCount: parseFloat(document.getElementById('f_instaCount').value) || 0,
+    instaRate: parseFloat(document.getElementById('f_instaRate').value) || 0,
   };
   if(editingId){
     reps = reps.map(r=> r.id === editingId ? data : r);
