@@ -626,9 +626,19 @@ function repLeaveAllowance(r, seg, priorMap){
   return repLeaveHours(r, priorMap) * 48*25 / 312;
 }
 
+// قاعدة أوردرات الـ25: أول 80 أوردر بالسعر العادي، وأي أوردر فوق كده بسعر أعلى
+const DEL25_THRESHOLD = 80;
+const DEL25_OVER_RATE = 30;
+
+function del25Pay(r){
+  const base = Math.min(r.del25Count, DEL25_THRESHOLD);
+  const over = Math.max(r.del25Count - DEL25_THRESHOLD, 0);
+  return base * r.del25Rate + over * DEL25_OVER_RATE;
+}
+
 function repTotal(r){
   const hoursPay = (r.hours - r.late) * r.rate;
-  const del25 = r.del25Count * r.del25Rate;
+  const del25 = del25Pay(r);
   const del30 = r.del30Count * r.del30Rate;
   const transfer = r.trCount * r.trRate;
   const leave = repLeaveAllowance(r, currentSeg, priorHoursMap);
@@ -774,7 +784,9 @@ function render(){
       <td class="rep-name">${escapeHtml(r.name)}</td>
       <td class="num-cell">${r.hours} × ${money(r.rate)}</td>
       <td class="num-cell deduct">${r.late} س</td>
-      <td class="num-cell">${r.del25Count} × ${money(r.del25Rate)}</td>
+      <td class="num-cell">${r.del25Count > DEL25_THRESHOLD
+        ? `${DEL25_THRESHOLD} × ${money(r.del25Rate)} + ${r.del25Count - DEL25_THRESHOLD} × ${money(DEL25_OVER_RATE)}`
+        : `${r.del25Count} × ${money(r.del25Rate)}`}</td>
       <td class="num-cell">${r.del30Count} × ${money(r.del30Rate)}</td>
       <td class="num-cell">${r.trCount} × ${money(r.trRate)}</td>
       ${leaveCell}
@@ -937,7 +949,7 @@ async function exportExcel(){
     }
     const rows = repsData.map(r=>{
       const leave = repLeaveAllowance(r, p.seg, priorMap);
-      const total = (r.hours - r.late) * r.rate + r.del25Count * r.del25Rate + r.del30Count * r.del30Rate + r.trCount * r.trRate + leave;
+      const total = (r.hours - r.late) * r.rate + del25Pay(r) + r.del30Count * r.del30Rate + r.trCount * r.trRate + leave;
       return {
         'المندوب': r.name,
         'الساعات': r.hours,
