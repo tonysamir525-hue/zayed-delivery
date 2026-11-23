@@ -343,6 +343,36 @@
   }
   .period-pill:hover{background:var(--border);}
   .period-pill.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+
+  .import-summary{
+    cursor:pointer;
+    font-family:'Cairo', sans-serif;
+    font-size:16px;
+    font-weight:700;
+    color:var(--primary-dark);
+  }
+  .import-body{margin-top:14px;}
+  .import-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0;}
+  @media (max-width:900px){ .import-grid{grid-template-columns:1fr;} }
+  .import-slot{
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .import-slot label{font-size:13px;font-weight:700;color:var(--primary-dark);}
+  .import-slot input[type=file]{font-size:12.5px;max-width:100%;}
+  .import-slot .icon-btn{align-self:flex-start;}
+  .imp-opt{font-size:12px;font-weight:500 !important;color:var(--text-muted) !important;cursor:pointer;}
+  .imp-ver{font-family:'JetBrains Mono', monospace;font-size:11px;font-weight:500;color:var(--text-muted);margin-right:8px;}
+  .imp-ok{color:var(--primary);font-weight:700;font-size:12.5px;}
+  .imp-new{color:var(--danger);font-size:12.5px;font-weight:500;cursor:pointer;}
+  .imp-warns{background:var(--danger-light);color:#6E2A1B;border-radius:10px;padding:9px 14px;margin:10px 0;font-size:12.5px;}
+  .imp-info{background:var(--primary-light);color:var(--primary-dark);border-radius:10px;padding:9px 14px;margin:10px 0;font-size:12.5px;}
+  .imp-warns ul,.imp-info ul{margin:0;padding-right:18px;}
 </style>
 </head>
 <body>
@@ -419,6 +449,32 @@
     <span>هذه الفترة الثالثة: بيتضاف تلقائي <b>بدل إجازات</b> لكل مندوب = (إجمالي ساعاته في الفترات الثلاث × ٤٨ ÷ ٣١٢).</span>
   </div>
 
+  <details class="roster-panel" id="importPanel">
+    <summary class="import-summary">رفع شيتات الفترة (ساعات / أوردرات / تحويلات) <span class="imp-ver">إصدار 2026-11-23</span></summary>
+    <div class="import-body">
+      <div class="roster-empty">الشيتات هتتحسب على الفترة المحددة حالياً: <b id="importPeriodLabel"></b>. الأسماء بتتطابق مع المندوبين المسجلين، والقيم بتحل محل قيم المندوب في الفترة دي. لو الشيت فيه عمود تاريخ بيتاخد منه صفوف الفترة بس.</div>
+      <div class="import-grid">
+        <div class="import-slot">
+          <label for="imp_hours">١) شيت الساعات والتأخيرات</label>
+          <input type="file" id="imp_hours" accept=".xlsx,.xls,.csv">
+          <button type="button" class="icon-btn" data-template="hours">تحميل نموذج</button>
+        </div>
+        <div class="import-slot">
+          <label for="imp_orders">٢) شيت الأوردرات</label>
+          <input type="file" id="imp_orders" accept=".xlsx,.xls,.csv">
+          <label class="imp-opt"><input type="checkbox" id="imp_ext30" checked> أسماء «خارجي» = أوردرات ٣٠ للمندوب الأساسي</label>
+          <button type="button" class="icon-btn" data-template="orders">تحميل نموذج</button>
+        </div>
+        <div class="import-slot">
+          <label for="imp_transfers">٣) شيت التحويلات</label>
+          <input type="file" id="imp_transfers" accept=".xlsx,.xls,.csv">
+          <button type="button" class="icon-btn" data-template="transfers">تحميل نموذج</button>
+        </div>
+      </div>
+      <div id="importPreview"></div>
+    </div>
+  </details>
+
   <div class="layout">
     <section class="panel form-panel">
       <h2 id="formTitle">إضافة بيانات مندوب</h2>
@@ -446,6 +502,12 @@
         <div class="field">
           <label for="f_late">عدد ساعات التأخير</label>
           <input type="number" id="f_late" min="0" step="any" value="">
+        </div>
+
+        <div class="field">
+          <label for="f_lateList">أو اكتب دقائق كل تأخيرة (مفصولة بمسافة أو فاصلة)</label>
+          <input type="text" id="f_lateList" placeholder="مثال: 17 45 20" autocomplete="off">
+          <div class="roster-empty" id="lateHint"></div>
         </div>
 
         <div class="group-title">عمولة التوصيل - أوردر ٢٥ جنيه</div>
@@ -897,6 +959,7 @@ async function loadPeriod(month, seg){
   priorHoursMap = isSeg3() ? await buildPriorHoursMap(month) : {};
 
   render();
+  onImportPeriodChanged();
   await refreshPeriodsList();
 }
 
@@ -1011,6 +1074,8 @@ function startEdit(id){
   document.getElementById('f_hours').value = r.hours;
   document.getElementById('f_rate').value = r.rate;
   document.getElementById('f_late').value = r.late;
+  document.getElementById('f_lateList').value = '';
+  document.getElementById('lateHint').textContent = LATE_HINT_DEFAULT;
   document.getElementById('f_del25Count').value = r.del25Count;
   document.getElementById('f_del25Rate').value = r.del25Rate;
   document.getElementById('f_del30Count').value = r.del30Count;
@@ -1028,6 +1093,7 @@ function startEdit(id){
 function resetForm(){
   editingId = null;
   document.getElementById('repForm').reset();
+  document.getElementById('lateHint').textContent = LATE_HINT_DEFAULT;
   document.getElementById('f_rate').value = 25;
   document.getElementById('f_del25Rate').value = 25;
   document.getElementById('f_del30Rate').value = 30;
@@ -1135,6 +1201,545 @@ async function exportExcel(){
   setStatus('تم تنزيل ملف الإكسيل.', false);
 }
 
+// ===== IMPORT:START =====
+// استيراد الشيتات: بنقرا ملفات إكسيل/CSV ونجمّع لكل مندوب (بالاسم) الساعات والأوردرات والتحويلات.
+// التأخير ٣٠ دقيقة أو أقل مابيتخصمش، وأكتر من كده بيتخصم بالكامل (٤٥ دقيقة تتخصم ٤٥)
+const LATE_GRACE_MIN = 30;
+const IMPORT_DEFAULTS = {rate:25, del25Rate:25, del30Rate:30, trRate:25, instaRate:2.5};
+
+function normAr(s){
+  return String(s == null ? '' : s)
+    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+// مفتاح المقارنة بين الأسماء: من غير مسافات (عبد الحليم = عبدالحليم) ومن غير فرق الهمزات والتاء المربوطة
+function nameKey(s){ return normAr(s).replace(/\s+/g, ''); }
+
+function toNum(v){
+  if(typeof v === 'number') return isFinite(v) ? v : null;
+  if(v == null) return null;
+  let s = normAr(v).replace(/٫/g, '.').replace(/[^\d.,-]/g, '');
+  if(!s) return null;
+  if(s.includes(',') && s.includes('.')) s = s.replace(/,/g, '');
+  else if(/^-?\d+,\d{1,2}$/.test(s)) s = s.replace(',', '.');
+  else s = s.replace(/,/g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+function parseHoursCell(v){
+  if(typeof v === 'string'){
+    const m = normAr(v).match(/^(\d+):(\d{1,2})(?::\d{1,2})?$/);
+    if(m) return parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
+  }
+  return toNum(v);
+}
+
+function parseDateCell(v){
+  if(v == null || v === '') return null;
+  if(v instanceof Date && !isNaN(v)) return {y:v.getFullYear(), m:v.getMonth()+1, d:v.getDate()};
+  if(typeof v === 'number'){
+    if(v < 20000 || v > 80000) return null;
+    const p = XLSX.SSF.parse_date_code(v);
+    return p ? {y:p.y, m:p.m, d:p.d} : null;
+  }
+  const s = normAr(v);
+  let m = s.match(/(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(m) return {y:+m[1], m:+m[2], d:+m[3]};
+  m = s.match(/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+  if(m) return {y:+m[3], m:+m[2], d:+m[1]};   // يوم/شهر/سنة
+  return null;
+}
+
+function segRange(seg){ return seg === 1 ? [1,10] : seg === 2 ? [11,20] : [21,31]; }
+
+// 'in' جوه الفترة | 'out' برة الفترة | 'none' مفيش تاريخ مفهوم
+function periodStatus(dateVal, ctx){
+  const d = parseDateCell(dateVal);
+  if(!d) return 'none';
+  const [y, mo] = ctx.month.split('-').map(Number);
+  const [from, to] = segRange(ctx.seg);
+  return (d.y === y && d.m === mo && d.d >= from && d.d <= to) ? 'in' : 'out';
+}
+
+const NAME_KEYS = ['اسم المندوب','المندوب','اسم الدليفري','الدليفري','دليفري','اسم الكابتن','الكابتن','كابتن','السائق','اسم الموظف','الموظف','الاسم','اسم','name','rep','driver'];
+const SKIP_NAMES = ['المجموع','الاجمالي','اجمالي','الاجمالي الكلي','المجموع الكلي','مجموع','total','sum','grand total'];
+
+function findCol(hs, keys, exclude){
+  exclude = exclude || [];
+  for(const k of keys){
+    const nk = normAr(k);
+    const c = hs.findIndex((h, i) => h && !exclude.includes(i) && h.includes(nk));
+    if(c >= 0) return c;
+  }
+  return -1;
+}
+
+function findHeader(rows){
+  for(let i = 0; i < Math.min(rows.length, 15); i++){
+    const raw = rows[i] || [];
+    const hs = raw.map(normAr);
+    if(hs.filter(Boolean).length < 2) continue;      // صف عنوان (خلية واحدة) مش صف أعمدة
+    for(const k of NAME_KEYS){
+      const nk = normAr(k);
+      const c = hs.findIndex(h => h && h.includes(nk));
+      if(c >= 0) return {row:i, nameCol:c, hs, raw:raw.map(x => String(x == null ? '' : x))};
+    }
+  }
+  return null;
+}
+
+function sheetToRows(ws){
+  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+}
+
+function getRec(map, rawName){
+  const nk = normAr(rawName);
+  if(!nk || SKIP_NAMES.includes(nk)) return null;
+  const key = nameKey(rawName);
+  if(!map.has(key)) map.set(key, {name:String(rawName).trim(), fields:{}});
+  return map.get(key);
+}
+function addField(rec, f, v){ rec.fields[f] = (rec.fields[f] || 0) + v; }
+function ensureField(rec, f){ if(rec.fields[f] == null) rec.fields[f] = 0; }
+
+// يلف على كل تابات الملف ويستدعي fn لكل تاب فيه عمود اسم
+function eachTab(wb, label, out, fn, finder){
+  wb.SheetNames.forEach(sn=>{
+    const rows = sheetToRows(wb.Sheets[sn]);
+    const h = (finder || findHeader)(rows);
+    if(!h){ out.warns.push(`${label}: تاب «${sn}» اتجاهل — مالقيتش عمود اسم المندوب.`); return; }
+    const stats = {out:0, none:0};
+    fn(rows, h, sn, stats);
+    if(stats.out) out.warns.push(`${label}: تاب «${sn}» — تجاهلت ${stats.out} صف تاريخه برة الفترة المحددة.`);
+    if(stats.none && stats.none !== rows.length) out.info.push(`${label}: تاب «${sn}» — ${stats.none} صف من غير تاريخ مفهوم اتحسبوا على الفترة.`);
+  });
+}
+
+function parseHoursSheet(wb, ctx){
+  const out = {map:new Map(), info:[], warns:[]};
+  const L = 'الساعات';
+  eachTab(wb, L, out, (rows, h, sn, stats)=>{
+    const lateCol  = findCol(h.hs, ['تاخير','late','delay']);
+    const hoursCol = findCol(h.hs, ['ساعات العمل','عدد الساعات','عدد ساعات','الساعات','ساعات','hours','hrs'], lateCol >= 0 ? [lateCol] : []);
+    const dateCol  = findCol(h.hs, ['التاريخ','تاريخ','date','اليوم']);
+    if(hoursCol < 0 && lateCol < 0){ out.warns.push(`${L}: تاب «${sn}» اتجاهل — مالقيتش عمود ساعات ولا تأخير.`); return; }
+    const lateMin = lateCol >= 0 && /دقيق|دقائق|min/.test(h.hs[lateCol]);
+    out.info.push(`${L}: الساعات من عمود «${hoursCol >= 0 ? h.raw[hoursCol] : '—'}»، التأخير من عمود «${lateCol >= 0 ? h.raw[lateCol] : '—'}»${lateMin ? ' (دقائق → اتحوّلت لساعات)' : ''}.`);
+    let graceIgnored = 0, lateCounted = 0;
+    for(let i = h.row + 1; i < rows.length; i++){
+      const r = rows[i];
+      const rec = getRec(out.map, r[h.nameCol]);
+      if(!rec) continue;
+      if(dateCol >= 0){
+        const st = periodStatus(r[dateCol], ctx);
+        if(st === 'out'){ stats.out++; continue; }
+        if(st === 'none') stats.none++;
+      }
+      if(hoursCol >= 0){ ensureField(rec, 'hours'); const v = parseHoursCell(r[hoursCol]); if(v != null) addField(rec, 'hours', v); }
+      if(lateCol >= 0){
+        ensureField(rec, 'late');
+        const v = parseHoursCell(r[lateCol]);
+        if(v != null && v > 0){
+          const lateHrs = lateMin ? v / 60 : v;
+          if(lateHrs * 60 > LATE_GRACE_MIN + 1e-9){ addField(rec, 'late', lateHrs); lateCounted++; }
+          else graceIgnored++;
+        }
+      }
+    }
+    if(lateCol >= 0) out.info.push(`${L}: كل صف تأخير بيتحسب لوحده — ${graceIgnored} تأخيرة ${LATE_GRACE_MIN} دقيقة أو أقل اتجاهلت (مااتخصمتش)، و${lateCounted} تأخيرة أكتر من كده اتخصمت بالكامل.`);
+  });
+  return out;
+}
+
+function isYes(cell){
+  if(typeof cell === 'number') return cell > 0;
+  const s = normAr(cell);
+  return s.includes('انستا') || s.includes('insta') || ['1','نعم','yes','true','y','x','✓','√'].includes(s);
+}
+
+// تقرير مبيعات البائعين (Seller Sales & Returns): الجدول بيبدأ بعد قايمة فلاتر طويلة، فبندوّر على صف العناوين في الشيت كله
+function findAlphaHeader(rows){
+  for(let i = 0; i < rows.length; i++){
+    const hs = (rows[i] || []).map(normAr);
+    const n = hs.indexOf('seller name'), c = hs.indexOf('sales count');
+    if(n >= 0 && c >= 0) return {row:i, nameCol:n, countCol:c, hs, raw:rows[i].map(x => String(x == null ? '' : x)), alpha:true};
+  }
+  return null;
+}
+function findOrdersHeader(rows){ return findAlphaHeader(rows) || findHeader(rows); }
+
+// فترة التقرير (Start Date / End Date). التوقيت بيجي +ساعة، فنهاية 00:59 معناها آخر اليوم اللي قبله
+function findReportRange(rows){
+  for(let i = 0; i < Math.min(rows.length, 40); i++){
+    const hs = (rows[i] || []).map(normAr);
+    const sc = hs.indexOf('start date'), ec = hs.indexOf('end date');
+    if(sc < 0 || ec < 0) continue;
+    const nxt = rows[i + 1] || [];
+    const a = parseDateCell(nxt[sc]), b = parseDateCell(nxt[ec]);
+    if(!a || !b) continue;
+    let end = b;
+    const tm = String(nxt[ec]).match(/(\d{1,2}):(\d{2})/);
+    if(tm && +tm[1] < 6){
+      const dt = new Date(Date.UTC(b.y, b.m - 1, b.d - 1));
+      end = {y:dt.getUTCFullYear(), m:dt.getUTCMonth() + 1, d:dt.getUTCDate()};
+    }
+    return {start:a, end};
+  }
+  return null;
+}
+
+function parseAlphaOrders(rows, h, sn, out, ctx, L){
+  const nameCol = h.nameCol, cntCol = h.countCol;
+  out.info.push(`${L}: تقرير مبيعات — الاسم من «${h.raw[nameCol]}» والعدد من «${h.raw[cntCol]}». أي اسم اتكرر في أكتر من سطر (فروع مختلفة) بيتجمع. ` +
+    (ctx.externalAs30
+      ? 'الاسم العادي ← أوردرات ٢٥ (وقاعدة الـ٨٠ أوردر بتتطبق في الحساب)، والاسم اللي آخره «خارجي» ← أوردرات ٣٠ للمندوب الأساسي.'
+      : 'العدد كله بيتسجّل أوردرات ٢٥، وقاعدة الـ٨٠ أوردر بتتطبق في الحساب.'));
+  const range = findReportRange(rows);
+  if(range){
+    const [y, mo] = ctx.month.split('-').map(Number);
+    const from = segRange(ctx.seg)[0];
+    const to = Math.min(segRange(ctx.seg)[1], new Date(y, mo, 0).getDate());
+    const fmt = d => `${String(d.d).padStart(2, '0')}-${String(d.m).padStart(2, '0')}-${d.y}`;
+    const inside = range.start.y === y && range.start.m === mo && range.end.y === y && range.end.m === mo
+      && range.start.d === from && range.end.d <= to;
+    if(!inside) out.warns.push(`${L}: التقرير بيغطي من ${fmt(range.start)} إلى ${fmt(range.end)} وده مش نفس الفترة المحددة (${from} → ${to} من ${ctx.month}). اتأكد إنك مختار الفترة الصح قبل التطبيق.`);
+    else if(range.end.d < to) out.info.push(`${L}: التقرير من ${fmt(range.start)} لحد ${fmt(range.end)} بس (الفترة بتنتهي يوم ${to}).`);
+    else out.info.push(`${L}: فترة التقرير ${fmt(range.start)} → ${fmt(range.end)} ✓ مطابقة للفترة المحددة.`);
+  }
+  const seen = new Map(), ext = [];
+  for(let i = h.row + 1; i < rows.length; i++){
+    const r = rows[i];
+    const raw = r[nameCol];
+    const nm = normAr(raw);
+    if(!nm || SKIP_NAMES.includes(nm)) continue;           // صف الإجمالي أو صف فاضي
+    const n = toNum(r[cntCol]);
+    if(n == null) continue;
+    const isExt = nm.endsWith('خارجي');
+    if(isExt && ctx.externalAs30){
+      const base = String(raw).replace(/\s*خارج[يى]\s*$/, '').trim();
+      const rec = getRec(out.map, base);
+      if(!rec) continue;
+      ensureField(rec, 'del25Count'); ensureField(rec, 'del30Count');
+      addField(rec, 'del30Count', n);
+    }else{
+      if(isExt) ext.push(String(raw).trim());
+      const rec = getRec(out.map, raw);
+      if(!rec) continue;
+      ensureField(rec, 'del25Count');
+      if(ctx.externalAs30) ensureField(rec, 'del30Count');
+      addField(rec, 'del25Count', n);
+      const k = nameKey(raw);
+      seen.set(k, (seen.get(k) || 0) + 1);
+    }
+  }
+  const dups = [...seen.values()].filter(c => c > 1).length;
+  if(dups) out.info.push(`${L}: ${dups} مندوب ظهروا في أكتر من سطر واتجمعت أوردراتهم.`);
+  if(ext.length) out.warns.push(`${L}: لقيت ${ext.length} اسم آخره «خارجي» (زي «${ext[0]}») واتعاملوا كمندوبين منفصلين. لو دي أوردرات ٣٠ للمندوب الأساسي، فعّل الخيار اللي تحت خانة شيت الأوردرات.`);
+}
+
+function parseOrdersSheet(wb, ctx){
+  const out = {map:new Map(), info:[], warns:[]};
+  const L = 'الأوردرات';
+  eachTab(wb, L, out, (rows, h, sn, stats)=>{
+    if(h.alpha){ parseAlphaOrders(rows, h, sn, out, ctx, L); return; }
+    const dateCol  = findCol(h.hs, ['التاريخ','تاريخ','date','اليوم']);
+    let instaCol = findCol(h.hs, ['انستا','insta']);
+    const col25 = h.hs.findIndex(x => x && /(^|\D)25(\D|$)/.test(x) && !/30/.test(x));
+    const col30 = h.hs.findIndex(x => x && /(^|\D)30(\D|$)/.test(x) && !/25/.test(x));
+    const summary = col25 >= 0 || col30 >= 0;
+    let instaByValue = false;
+    if(!summary && instaCol < 0){
+      // مفيش عمود اسمه انستاشوب: ندوّر على عمود (زي «المصدر») قيمه فيها كلمة انستاشوب
+      const body = rows.slice(h.row + 1);
+      for(let c = 0; c < h.hs.length && instaCol < 0; c++){
+        if(c === h.nameCol || c === dateCol) continue;
+        if(body.some(r => typeof r[c] === 'string' && /انستا|insta/.test(normAr(r[c])))){ instaCol = c; instaByValue = true; }
+      }
+    }
+    let valueCol = -1;
+    if(!summary){
+      valueCol = findCol(h.hs, ['قيمه التوصيل','سعر التوصيل','رسوم التوصيل','عموله التوصيل','قيمه الاوردر','سعر الاوردر','التوصيل','المبلغ','القيمه','السعر','fee','price','amount','value'], instaCol >= 0 ? [instaCol] : []);
+      if(valueCol < 0){ out.warns.push(`${L}: تاب «${sn}» اتجاهل — مالقيتش عمود أعمدة ٢٥/٣٠ ولا عمود قيمة التوصيل.`); return; }
+      out.info.push(`${L}: صف لكل أوردر، قيمة التوصيل من عمود «${h.raw[valueCol]}»${instaCol >= 0 ? `، وانستاشوب من عمود «${h.raw[instaCol]}»${instaByValue ? ' (الصفوف اللي فيها كلمة انستاشوب)' : ''}` : ' (مفيش عمود انستاشوب، فمش هغيّر حوافز انستاشوب)'}.`);
+    }else{
+      out.info.push(`${L}: ملخص لكل مندوب — أوردرات ٢٥ من «${col25 >= 0 ? h.raw[col25] : '—'}»، ٣٠ من «${col30 >= 0 ? h.raw[col30] : '—'}»${instaCol >= 0 ? `، انستاشوب من «${h.raw[instaCol]}»` : ''}.`);
+    }
+    let other = 0;
+    for(let i = h.row + 1; i < rows.length; i++){
+      const r = rows[i];
+      const rec = getRec(out.map, r[h.nameCol]);
+      if(!rec) continue;
+      if(dateCol >= 0){
+        const st = periodStatus(r[dateCol], ctx);
+        if(st === 'out'){ stats.out++; continue; }
+        if(st === 'none') stats.none++;
+      }
+      if(summary){
+        if(col25 >= 0){ ensureField(rec, 'del25Count'); addField(rec, 'del25Count', toNum(r[col25]) || 0); }
+        if(col30 >= 0){ ensureField(rec, 'del30Count'); addField(rec, 'del30Count', toNum(r[col30]) || 0); }
+        if(instaCol >= 0){ ensureField(rec, 'instaCount'); addField(rec, 'instaCount', toNum(r[instaCol]) || 0); }
+      }else{
+        ensureField(rec, 'del25Count'); ensureField(rec, 'del30Count');
+        const v = toNum(r[valueCol]);
+        if(v === 25) addField(rec, 'del25Count', 1);
+        else if(v === 30) addField(rec, 'del30Count', 1);
+        else other++;
+        if(instaCol >= 0){ ensureField(rec, 'instaCount'); if(isYes(r[instaCol])) addField(rec, 'instaCount', 1); }
+      }
+    }
+    if(other) out.warns.push(`${L}: تاب «${sn}» — ${other} أوردر قيمته مش ٢٥ ولا ٣٠ ومااتحسبش.`);
+  }, findOrdersHeader);
+  return out;
+}
+
+function parseTransfersSheet(wb, ctx){
+  const out = {map:new Map(), info:[], warns:[]};
+  const L = 'التحويلات';
+  eachTab(wb, L, out, (rows, h, sn, stats)=>{
+    const dateCol = findCol(h.hs, ['التاريخ','تاريخ','date','اليوم']);
+    let countCol = findCol(h.hs, ['عدد التحويلات','عدد التحويل','التحويلات','تحويلات','عدد','count','qty','quantity'], [h.nameCol]);
+    if(countCol >= 0){
+      const hasNum = rows.slice(h.row + 1).some(r => toNum(r[countCol]) != null);
+      if(!hasNum) countCol = -1;
+    }
+    out.info.push(countCol >= 0 ? `${L}: العدد من عمود «${h.raw[countCol]}».` : `${L}: كل صف = تحويلة واحدة.`);
+    for(let i = h.row + 1; i < rows.length; i++){
+      const r = rows[i];
+      const rec = getRec(out.map, r[h.nameCol]);
+      if(!rec) continue;
+      if(dateCol >= 0){
+        const st = periodStatus(r[dateCol], ctx);
+        if(st === 'out'){ stats.out++; continue; }
+        if(st === 'none') stats.none++;
+      }
+      ensureField(rec, 'trCount');
+      addField(rec, 'trCount', countCol >= 0 ? (toNum(r[countCol]) || 0) : 1);
+    }
+  });
+  return out;
+}
+
+// دمج نتائج الشيتات التلاتة في صفوف لكل مندوب، ومطابقتها بقايمة المسجلين
+function mergeImport(parts, rosterNames){
+  const rosterIndex = new Map(rosterNames.map(n => [nameKey(n), n]));
+  const rows = new Map();
+  Object.keys(parts).forEach(kind=>{
+    parts[kind].forEach((rec, key)=>{
+      const row = rows.get(key) || {key, display:rec.name, fields:{}};
+      Object.assign(row.fields, rec.fields);
+      rows.set(key, row);
+    });
+  });
+  return [...rows.values()]
+    .map(r => Object.assign(r, {matchedName: rosterIndex.get(r.key) || null}))
+    .sort((a, b) => (b.matchedName ? 1 : 0) - (a.matchedName ? 1 : 0) || a.display.localeCompare(b.display, 'ar'));
+}
+// ===== IMPORT:END =====
+
+// حساب ساعات التأخير من دقائق كل تأخيرة: ٣٠ دقيقة أو أقل مابتتخصمش، وأكتر من كده بتتخصم كلها
+const LATE_HINT_DEFAULT = 'التأخيرة ٣٠ دقيقة أو أقل مابتتخصمش، وأكتر من كده بتتخصم بالكامل.';
+function lateFromList(text){
+  const nums = normAr(text).split(/[\s,،;+]+/).map(x => parseFloat(x)).filter(n => !isNaN(n) && n > 0);
+  let counted = 0, deducted = 0, ignored = 0;
+  nums.forEach(m => { if(m > LATE_GRACE_MIN){ counted += m; deducted++; } else ignored++; });
+  return {hours: counted / 60, minutes: counted, deducted, ignored, any: nums.length > 0};
+}
+function onLateListInput(){
+  const txt = document.getElementById('f_lateList').value;
+  const hint = document.getElementById('lateHint');
+  if(!txt.trim()){ hint.textContent = LATE_HINT_DEFAULT; return; }
+  const r = lateFromList(txt);
+  document.getElementById('f_late').value = r.any ? (Math.round(r.hours * 100) / 100) : '';
+  hint.textContent = `اتخصم ${r.minutes} دقيقة (= ${Math.round(r.hours * 100) / 100} ساعة) من ${r.deducted} تأخيرة` + (r.ignored ? `، وتخطّيت ${r.ignored} تأخيرة ${LATE_GRACE_MIN} دقيقة أو أقل.` : '.');
+}
+
+
+const importState = {files:{hours:null, orders:null, transfers:null}, result:null, ctxKey:'', token:0};
+const IMPORT_LABELS = {hours:'الساعات والتأخيرات', orders:'الأوردرات', transfers:'التحويلات'};
+const FIELD_LABELS = {hours:'الساعات', late:'التأخير', del25Count:'أوردرات ٢٥', del30Count:'أوردرات ٣٠', instaCount:'انستاشوب', trCount:'التحويلات'};
+const SEG_NAMES = {1:'١ - ١٠', 2:'١١ - ٢٠', 3:'٢١ - آخر الشهر'};
+const IMPORT_PARSERS = {hours:parseHoursSheet, orders:parseOrdersSheet, transfers:parseTransfersSheet};
+
+function round2(v){ return Math.round(v * 100) / 100; }
+
+function updateImportLabel(){
+  const el = document.getElementById('importPeriodLabel');
+  if(el) el.textContent = currentMonth + ' · ' + SEG_NAMES[currentSeg];
+}
+
+function onImportPeriodChanged(){
+  updateImportLabel();
+  if(importState.result && importState.ctxKey !== currentMonth + ':' + currentSeg) buildImportPreview();
+}
+
+function readWorkbook(file){
+  return new Promise((resolve, reject)=>{
+    const fr = new FileReader();
+    const isCsv = /\.csv$/i.test(file.name);
+    fr.onload = ()=>{
+      try{
+        resolve(isCsv ? XLSX.read(fr.result, {type:'string'}) : XLSX.read(new Uint8Array(fr.result), {type:'array'}));
+      }catch(e){ reject(e); }
+    };
+    fr.onerror = ()=> reject(fr.error);
+    if(isCsv) fr.readAsText(file, 'UTF-8'); else fr.readAsArrayBuffer(file);
+  });
+}
+
+async function buildImportPreview(){
+  const box = document.getElementById('importPreview');
+  const files = importState.files;
+  const kinds = Object.keys(files).filter(k => files[k]);
+  const token = ++importState.token;
+  if(kinds.length === 0){ importState.result = null; box.innerHTML = ''; return; }
+  if(typeof XLSX === 'undefined'){
+    box.innerHTML = '<div class="status-msg error">مكتبة قراءة الإكسيل لسه بتحمّل أو مش متاحة (محتاج نت). جرب تاني بعد شوية.</div>';
+    return;
+  }
+  box.innerHTML = '<div class="roster-empty">جاري قراءة الملفات...</div>';
+  const ctx = {month:currentMonth, seg:currentSeg, externalAs30: document.getElementById('imp_ext30').checked};
+  const parts = {}, info = [], warns = [];
+  try{
+    for(const kind of kinds){
+      const wb = await readWorkbook(files[kind]);
+      const res = IMPORT_PARSERS[kind](wb, ctx);
+      parts[kind] = res.map;
+      info.push(...res.info);
+      warns.push(...res.warns);
+    }
+  }catch(e){
+    box.innerHTML = '<div class="status-msg error">مقدرتش أقرا واحد من الملفات. اتأكد إنه ملف إكسيل (xlsx/xls) أو CSV سليم.</div>';
+    return;
+  }
+  if(token !== importState.token) return;           // اتغيّر اختيار الملفات أثناء القراءة
+  const rows = mergeImport(parts, roster.map(m => m.name));
+  importState.result = {rows, info, warns};
+  importState.ctxKey = ctx.month + ':' + ctx.seg;
+  renderImportPreview();
+}
+
+function renderImportPreview(){
+  const box = document.getElementById('importPreview');
+  const res = importState.result;
+  if(!res){ box.innerHTML = ''; return; }
+  const list = (arr) => '<ul>' + arr.map(t => `<li>${escapeHtml(t)}</li>`).join('') + '</ul>';
+  let html = '';
+  if(res.info.length) html += `<div class="imp-info">${list(res.info)}</div>`;
+  if(res.warns.length) html += `<div class="imp-warns">${list(res.warns)}</div>`;
+  if(res.rows.length === 0){
+    box.innerHTML = html + '<div class="roster-empty">مالقيتش بيانات مندوبين في الملفات دي للفترة المحددة.</div>' +
+      '<div class="btn-row"><button type="button" class="btn-ghost" data-imp-cancel>إلغاء</button></div>';
+    return;
+  }
+  const cols = Object.keys(FIELD_LABELS).filter(f => res.rows.some(r => f in r.fields));
+  const head = cols.map(f => `<th>${FIELD_LABELS[f]}</th>`).join('');
+  const body = res.rows.map((r, i)=>`<tr>
+    <td class="rep-name">${escapeHtml(r.display)}</td>
+    ${cols.map(f => `<td class="num-cell">${f in r.fields ? round2(r.fields[f]) : '—'}</td>`).join('')}
+    <td>${r.matchedName
+      ? '<span class="imp-ok">✓ مسجل</span>'
+      : `<label class="imp-new"><input type="checkbox" data-reg="${i}"> غير مسجل — سجّله واستورده</label>`}</td>
+  </tr>`).join('');
+  const nMatched = res.rows.filter(r => r.matchedName).length;
+  const nUnreg = res.rows.length - nMatched;
+  html += `<div class="roster-empty">${nMatched} مندوب مسجل · ${nUnreg} غير مسجل (هيتخطّوا لو ماعلّمتهمش)</div>`;
+  if(nMatched === 0) html += `<div class="imp-warns">ولا اسم من الشيت مطابق للمندوبين المسجلين، فمش هيتطبّق أي حاجة لحد ما تعلّم على الأسماء (تسجّلهم وتستوردهم) أو تسجّلهم الأول من «المندوبين المسجلين».</div>`;
+  if(nUnreg > 0) html += `<label class="imp-new" style="display:block;margin:6px 0;"><input type="checkbox" id="imp_selall"> تحديد كل الأسماء غير المسجلة (${nUnreg}) — تسجيل واستيراد</label>`;
+  box.innerHTML = html + `<div class="table-scroll"><table>
+      <thead><tr><th>المندوب</th>${head}<th>الحالة</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table></div>
+    <div class="btn-row">
+      <button type="button" class="btn-primary" data-imp-apply>تطبيق على الفترة (${currentMonth} · ${SEG_NAMES[currentSeg]})</button>
+      <button type="button" class="btn-ghost" data-imp-cancel>إلغاء</button>
+    </div>`;
+}
+
+function clearImport(){
+  importState.files = {hours:null, orders:null, transfers:null};
+  importState.result = null;
+  importState.token++;
+  ['imp_hours','imp_orders','imp_transfers'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('importPreview').innerHTML = '';
+}
+
+async function applyImport(){
+  const res = importState.result;
+  if(!res) return;
+  if(importState.ctxKey !== currentMonth + ':' + currentSeg){
+    setStatus('الفترة اتغيّرت، استنى لحظة لحد ما المعاينة تتحدّث وبعدين دوس تطبيق.', true);
+    return;
+  }
+  let applied = 0, skipped = 0, registered = 0;
+  res.rows.forEach((row, i)=>{
+    let name = row.matchedName;
+    if(!name){
+      const cb = document.querySelector(`[data-reg="${i}"]`);
+      if(cb && cb.checked){
+        name = row.display.trim();
+        if(!roster.some(m => nameKey(m.name) === row.key)){
+          roster.push({id: 'm' + Date.now() + Math.floor(Math.random() * 1000) + i, name});
+          registered++;
+        }
+      }else{ skipped++; return; }
+    }
+    let rec = reps.find(r => nameKey(r.name) === row.key);
+    if(!rec){
+      const D = IMPORT_DEFAULTS;
+      rec = {id: 'r' + Date.now() + Math.floor(Math.random() * 1000) + i, name, hours:0, rate:D.rate, late:0,
+        del25Count:0, del25Rate:D.del25Rate, del30Count:0, del30Rate:D.del30Rate,
+        trCount:0, trRate:D.trRate, instaCount:0, instaRate:D.instaRate};
+      reps.push(rec);
+    }
+    Object.keys(row.fields).forEach(f => { rec[f] = round2(row.fields[f]); });
+    applied++;
+  });
+  if(registered){ renderRoster(); await saveRoster(); }
+  render();
+  await saveReps();
+  clearImport();
+  const msg = `✓ اتطبقت البيانات على ${applied} مندوب` + (registered ? `، واتسجّل ${registered} جديد` : '') + (skipped ? `، وتخطّيت ${skipped} غير مسجل` : '') + '.';
+  document.getElementById('importPreview').innerHTML = `<div class="imp-info">${escapeHtml(msg)}</div>`;
+  setStatus(msg, false);
+}
+
+function downloadTemplate(kind){
+  if(typeof XLSX === 'undefined'){ setStatus('مكتبة الإكسيل لسه بتحمّل، جرب تاني.', true); return; }
+  const T = {
+    hours:[['اسم المندوب','التاريخ','عدد الساعات','ساعات التأخير'],['أحمد محمود','2026-10-01',8,0.5]],
+    orders:[['اسم المندوب','التاريخ','رقم الأوردر','قيمة التوصيل','انستاشوب'],['أحمد محمود','2026-10-01',1001,25,''],['أحمد محمود','2026-10-01',1002,30,'نعم']],
+    transfers:[['اسم المندوب','التاريخ','من صيدلية','إلى صيدلية'],['أحمد محمود','2026-10-01','الفرع 1','الفرع 2']]
+  };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(T[kind]), 'Sheet1');
+  XLSX.writeFile(wb, 'نموذج-' + IMPORT_LABELS[kind] + '.xlsx');
+}
+
+[['imp_hours','hours'],['imp_orders','orders'],['imp_transfers','transfers']].forEach(([id, kind])=>{
+  document.getElementById(id).addEventListener('change', (e)=>{
+    importState.files[kind] = e.target.files[0] || null;
+    buildImportPreview();
+  });
+});
+document.getElementById('imp_ext30').addEventListener('change', ()=>{ if(importState.files.orders) buildImportPreview(); });
+document.querySelectorAll('[data-template]').forEach(btn=>{
+  btn.addEventListener('click', ()=> downloadTemplate(btn.getAttribute('data-template')));
+});
+document.getElementById('importPreview').addEventListener('change', (e)=>{
+  if(e.target && e.target.id === 'imp_selall'){
+    document.querySelectorAll('[data-reg]').forEach(cb => { cb.checked = e.target.checked; });
+  }
+});
+document.getElementById('importPreview').addEventListener('click', (e)=>{
+  if(e.target.closest('[data-imp-apply]')) applyImport();
+  else if(e.target.closest('[data-imp-cancel]')) clearImport();
+});
+
 document.getElementById('rosterAddBtn').addEventListener('click', async ()=>{
   const input = document.getElementById('rosterInput');
   const name = input.value.trim();
@@ -1186,6 +1791,8 @@ document.getElementById('repForm').addEventListener('submit', async (e)=>{
 });
 
 document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
+document.getElementById('f_lateList').addEventListener('input', onLateListInput);
+document.getElementById('lateHint').textContent = LATE_HINT_DEFAULT;
 document.getElementById('exportBtn').addEventListener('click', exportExcel);
 
 document.getElementById('periodInput').addEventListener('change', (e)=>{
