@@ -129,6 +129,8 @@
     font-family:'Tajawal', sans-serif;
   }
   .btn-export:hover{background:#072B24;}
+  .btn-export-alt{background:var(--surface-2);color:var(--primary-dark);border:1px solid var(--border-strong);}
+  .btn-export-alt:hover{background:var(--border);}
 
   .leave-banner{
     display:flex;
@@ -438,7 +440,8 @@
       </div>
     </div>
     <div class="toolbar-right">
-      <button type="button" class="btn-export" id="exportBtn">تنزيل ملف إكسيل</button>
+      <button type="button" class="btn-export" id="exportPeriodBtn">تنزيل شيت الفترة الحالية</button>
+      <button type="button" class="btn-export btn-export-alt" id="exportBtn">تنزيل كل الفترات</button>
       <div class="summary-chip">
         إجمالي مرتبات الفترة: <span class="num" id="periodTotal">0.00</span> جنيه
       </div>
@@ -1137,6 +1140,48 @@ async function refreshPeriodsList(){
   }
 }
 
+function buildExportRows(repsData, seg, priorMap){
+  return repsData.map(r=>{
+    const leave = repLeaveAllowance(r, seg, priorMap);
+    const total = (r.hours - r.late) * r.rate + del25Pay(r) + r.del30Count * r.del30Rate + r.trCount * r.trRate + instaPay(r) + leave;
+    return {
+      'المندوب': r.name,
+      'الساعات': r.hours,
+      'سعر الساعة': r.rate,
+      'ساعات التأخير': r.late,
+      'عدد أوردر 25': r.del25Count,
+      'عمولة أوردر 25': r.del25Rate,
+      'عدد أوردر 30': r.del30Count,
+      'عمولة أوردر 30': r.del30Rate,
+      'عدد التحويلات': r.trCount,
+      'عمولة التحويل': r.trRate,
+      'عدد أوردرات انستاشوب': r.instaCount || 0,
+      'حافز الأوردر (انستاشوب)': r.instaRate ?? INSTA_DEFAULT_RATE,
+      'حوافز انستاشوب': Math.round(instaPay(r) * 100) / 100,
+      'بدل إجازات': Math.round(leave * 100) / 100,
+      'الإجمالي': Math.round(total * 100) / 100
+    };
+  });
+}
+
+// تنزيل شيت الفترة الحالية بس (الشهر والفترة المختارين دلوقتي)
+function exportCurrentPeriod(){
+  if(typeof XLSX === 'undefined'){
+    setStatus('مكتبة التصدير لسه بتحمّل، جرب تاني بعد شوية.', true);
+    return;
+  }
+  if(!reps.length){
+    setStatus('مفيش بيانات في الفترة دي عشان تتصدّر.', true);
+    return;
+  }
+  const segLabel = {1:'ف1', 2:'ف2', 3:'ف3'};
+  const rows = buildExportRows(reps, currentSeg, isSeg3() ? priorHoursMap : {});
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), (currentMonth + '_' + segLabel[currentSeg]).substring(0, 31));
+  XLSX.writeFile(wb, 'مرتبات-' + currentMonth + '-' + segLabel[currentSeg] + '.xlsx');
+  setStatus('تم تنزيل شيت الفترة ' + currentMonth + ' · ' + SEG_NAMES[currentSeg] + '.', false);
+}
+
 async function exportExcel(){
   if(typeof XLSX === 'undefined'){
     setStatus('مكتبة التصدير لسه بتحمّل، جرب تاني بعد شوية.', true);
@@ -1171,27 +1216,7 @@ async function exportExcel(){
       if(!monthCache[p.month]) monthCache[p.month] = await buildPriorHoursMap(p.month);
       priorMap = monthCache[p.month];
     }
-    const rows = repsData.map(r=>{
-      const leave = repLeaveAllowance(r, p.seg, priorMap);
-      const total = (r.hours - r.late) * r.rate + del25Pay(r) + r.del30Count * r.del30Rate + r.trCount * r.trRate + instaPay(r) + leave;
-      return {
-        'المندوب': r.name,
-        'الساعات': r.hours,
-        'سعر الساعة': r.rate,
-        'ساعات التأخير': r.late,
-        'عدد أوردر 25': r.del25Count,
-        'عمولة أوردر 25': r.del25Rate,
-        'عدد أوردر 30': r.del30Count,
-        'عمولة أوردر 30': r.del30Rate,
-        'عدد التحويلات': r.trCount,
-        'عمولة التحويل': r.trRate,
-        'عدد أوردرات انستاشوب': r.instaCount || 0,
-        'حافز الأوردر (انستاشوب)': r.instaRate ?? INSTA_DEFAULT_RATE,
-        'حوافز انستاشوب': Math.round(instaPay(r) * 100) / 100,
-        'بدل إجازات': Math.round(leave * 100) / 100,
-        'الإجمالي': Math.round(total * 100) / 100
-      };
-    });
+    const rows = buildExportRows(repsData, p.seg, priorMap);
     const ws = XLSX.utils.json_to_sheet(rows);
     const sheetName = (p.month + '_' + segLabel[p.seg]).substring(0, 31);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
@@ -1794,6 +1819,7 @@ document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
 document.getElementById('f_lateList').addEventListener('input', onLateListInput);
 document.getElementById('lateHint').textContent = LATE_HINT_DEFAULT;
 document.getElementById('exportBtn').addEventListener('click', exportExcel);
+document.getElementById('exportPeriodBtn').addEventListener('click', exportCurrentPeriod);
 
 document.getElementById('periodInput').addEventListener('change', (e)=>{
   loadPeriod(e.target.value, currentSeg);
